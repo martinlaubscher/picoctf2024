@@ -16,7 +16,7 @@ Looking at the provided source code, we can see a suspicious variable normal_str
 
 Since puts is a libc function, it gets called via its got (global offset table) entry. if we can change this entry to point to system instead, we can pop a shell!
 
-So, we check the got entry for puts in radare2 and see that its stored at 0x404018
+So, we check the got entry for puts in radare2 and see that its stored at 0x404018 (use the ```v``` command to change to visual mode)
 ![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/7989ad93-9e98-4953-893e-eba048af8ae4)
 ![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/3cdbef57-1481-4e4a-ac02-e77e66399445)
 
