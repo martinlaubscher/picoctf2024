@@ -1,6 +1,17 @@
+# Classic Crackme 0x100 Writeup
 
+Points: 300<br>
+Challenge Author: Nandan Desai
 
-We start by checking out the binary using the ```file``` and ```checksec``` commands (checksec is provided by pwntools). Thisshow us that we're dealing with a little endian 64-bit executable.<br>
+Description:<br>
+A classic Crackme. Find the password, get the flag! Crack the Binary file locally and recover the password. Use the same password on the server to get the flag!
+
+Hint:<br>
+Let the machine figure out the symbols!
+
+## Solution
+
+We start by checking out the binary using the ```file``` and ```checksec``` commands (checksec is provided by pwntools). This shows us that we're dealing with a little endian 64-bit executable.<br>
 ![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/55acccb3-f1fa-4db8-b63a-0d9e1c18d73c)
 
 Next, we try to run the binary. It asks us for a password and then, after entering an arbitrary password, tells us that we failed (which was to be expected).<br>
@@ -21,4 +32,45 @@ The second point mentioned above becomes relevant when we check the arguent spec
 At this point we have a pretty good idea what our input is eventually compared against, so let's have a closer look at how our input is treated. From looking at the memcmp function, we know that our input (or what it is transformed to) is eventually stored in local_a8.<br>
 
 ![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/42a2c780-be8f-487f-a3d2-dccb265cce16)
+
+In line 34, we can see that our input is stored in local_a8 when we enter it. Between lines 42 and 50 there seems to be the core of this challenge where our input is transformed in some way. Checking the two for loops (lines 42 and 43), we see that we loop over our entire input a total of three times. Inside the inner loop is where the actual transformation takes place (line 48). There is quite a lot going on, with plenty of bitwise operations as well as some standard math operations. Looking at the inner loop a bit more closely, we notice:<br>
+- local_28 only depends on the index of the current character (local_10), the other values used in its calculation are hardcoded
+- the same holds for local_2c (only local_28 can change, which depends on the index of the current character as shown above)
+- iVar1 depends on both the index of the current character and its ASCII value. However, if we look more closely, we see that it basically just takes the ASCII value and applies an offset based on the index to it.
+- the current character in local_8 is replaced by a character that is determined through applying an offset based on iVar on on the character 'a' (stored in local_21). <br>
+![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/b2ea1a8f-b176-4ea4-84c2-f42244c17bbe)
+
+From the above we can conclude that in the end there is nothing fancier happening than an offset being calculated based on the index of each character of our input, which is then applied to the 'a' character to get the transformed input which then has to match the hardcoded password. Combining all the knowledge we gained so far, we now can run the program with 50 'a' characters as the input and check the transformed input by setting a breakpoint in gdb.<br>
+![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/4fef86c7-a71d-4a32-8162-0130bf4afe51)
+
+Remembering that our transformed was the first argument when calling the memcmp function, we note that our input of all 'a's has been transformed to ```addgdggjdggjgjjmdggjgjjmgjjmjmmpdggjgjjmgjjmjmmpgj```. We can further see that this is being checked against ```kgxmwpbpuqtorzapjhfmebmccvwycyvewpxiheifvnuqsrgexl``` (the second argument).
+![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/e8540970-358a-4018-8fb9-557596927842)
+
+Now we have everything to crack the password, since we can simply calculate the offset between the all 'a' transformed input and what it is checked against to find what we needto provide as the original input.
+```
+lookup = "abcdefghijklmnopqrstuvwxyz" * 2                                   #the alphabet (twice, to account for negative offsets)
+password_check = "kgxmwpbpuqtorzapjhfmebmccvwycyvewpxiheifvnuqsrgexl"       #what the password is checked against
+a_test = "addgdggjdggjgjjmdggjgjjmgjjmjmmpdggjgjjmgjjmjmmpgj"               #the result of what a password consisting of all a's is transformed to
+offset = []
+password = ""
+
+# get the offset applied to each character
+for char in a_test:
+    offset.append(lookup.index(char))
+
+#subtract the offset from the position of each character in password_check to find the character needed before the transformation
+for i in range(len(password_check)):
+    password += lookup[lookup.index(password_check[i])+26-offset[i]]
+
+print(password)
+```
+![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/f10a8cbe-c094-4b4f-9a6d-ced8596ca5ce)
+
+Testing this, we can see that it indeed gives us the correct input:<br>
+![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/b48b48a6-6733-4362-a2e8-d92f28f15358)
+
+As a final step, all that's left to do is enter the password on the server and we can get our flag!<br>
+```picoCTF{s0lv3_angry_symb0ls_45518832}```<br>
+![image](https://github.com/martinlaubscher/picoctf2024/assets/113263884/40cd4dbe-5c43-41f5-adcc-81bad4bc1c61)
+
 
